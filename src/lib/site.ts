@@ -6,8 +6,8 @@ export const SITE_TAGLINE = "Educational shopping clone";
 export const CATEGORIES = [
   { slug: "electronics", name: "Electronics" },
   { slug: "home-kitchen", name: "Home & Kitchen" },
-  { slug: "books", name: "Books" },
-  { slug: "fashion", name: "Fashion" },
-  { slug: "sports-outdoors", name: "Sports & Outdoors" },
   { slug: "beauty", name: "Beauty" },
+  { slug: "fashion", name: "Fashion" },
+  { slug: "watches-jewelry", name: "Watches & Jewelry" },
+  { slug: "sports-outdoors", name: "Sports & Outdoors" },
 ] as const;

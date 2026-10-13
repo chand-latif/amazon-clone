@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "seed": "node --env-file=.env.local scripts/seed.mts",
+    "seed:dry": "node scripts/seed.mts --dry-run"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # Needs no secrets: the unit tests are pure, and typegen/tsc/eslint only read source.
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+# The database tests (supabase/tests/*.sql) and `npm run test:race` need a real Supabase project and
+# credentials, so they are run by hand against a non-production project (see docs/TESTING.md).

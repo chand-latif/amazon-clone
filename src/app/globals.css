@@ -32,10 +32,23 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
+/* Focus ring: navy line with a white halo. Navy on white is ~17:1 and the halo keeps it visible on
+   the navy header and footer (white on navy is ~17:1). The old orange ring was ~2:1 on white. */
 a:focus-visible,
 button:focus-visible,
 select:focus-visible,
-input:focus-visible {
-  outline: 2px solid var(--accent);
+input:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--navy);
   outline-offset: 2px;
+  box-shadow: 0 0 0 5px #fff;
+}
+
+/* main is a programmatic focus target for the skip link; no ring when it receives focus. */
+main[tabindex]:focus,
+main[tabindex]:focus-visible {
+  outline: none;
+  box-shadow: none;
 }

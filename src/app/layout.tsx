@@ -28,8 +28,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       {/* suppressHydrationWarning: browser extensions inject attributes onto <body> */}
       <body id="top" suppressHydrationWarning className="flex min-h-full flex-col">
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-navy"
+        >
+          Skip to main content
+        </a>
         <Header />
-        <main className="mx-auto w-full max-w-[1500px] flex-1 px-3 py-4">{children}</main>
+        <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1500px] flex-1 px-3 py-4">{children}</main>
         <Footer />
       </body>
     </html>

@@ -12,7 +12,7 @@ Goal: one polished, complete shopping loop. Browse → search → PDP → cart �
 
 ## Progress
 - Slice 0 (scaffold, shell): done.
-- Slice 1 (schema, RLS, seed): migration applied to the Supabase project; RLS attack test passes (70/70); seed script written. **Seed not yet run** (needs `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`, then `npm run seed`).
+- Slice 1 (schema, RLS, seed): migration applied to the Supabase project; RLS attack test passes (70/70); seed script written. Seed run and verified idempotent: 81 products, 217 images in Storage, 243 reviews (`npm run seed`; needs `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`).
 - Slices 2 + 3 were built together: home page (hero carousel, deals strip, category rows) and `/s` search with URL-driven filters (category, price, rating), sort and pagination. Category browse is `/s?c=<slug>`; there is no separate `/c/[slug]` route.
 - Next: Slice 4 (product detail page at `/p/[slug]`). Product cards already link there, so it 404s until then.
 

@@ -157,6 +157,28 @@ begin
   r := r || public._t_check('A deletes 0 of B''s addresses',              public._t_rows(format('delete from public.addresses where user_id = %L', ub)) = 0);
   r := r || public._t_raises('A cannot INSERT an address for B',          format('insert into public.addresses (user_id, full_name, line1, city, region, postal_code, country) values (%L, ''x'', ''x'', ''x'', ''x'', ''x'', ''x'')', ub), '42501');
 
+  -- ADDRESSES: the DATABASE enforces its own limits (the REST API bypasses the server action)
+  r := r || public._t_check('a valid address is accepted',                 public._t_rows(format('insert into public.addresses (user_id, full_name, line1, city, region, postal_code, country, phone) values (%L, ''A Person'', ''9 Ok St'', ''Acity'', ''AR'', ''11111'', ''US'', ''+1 (555) 010-0100'')', ua)) = 1);
+  r := r || public._t_raises('101-char full_name is rejected',            format('insert into public.addresses (user_id, full_name, line1, city, region, postal_code, country) values (%L, repeat(''x'', 101), ''l'', ''c'', ''r'', ''1'', ''US'')', ua), '23514');
+  r := r || public._t_raises('whitespace-only full_name is rejected',     format('insert into public.addresses (user_id, full_name, line1, city, region, postal_code, country) values (%L, ''   '', ''l'', ''c'', ''r'', ''1'', ''US'')', ua), '23514');
+  r := r || public._t_raises('201-char line1 is rejected',                format('insert into public.addresses (user_id, full_name, line1, city, region, postal_code, country) values (%L, ''n'', repeat(''x'', 201), ''c'', ''r'', ''1'', ''US'')', ua), '23514');
+  r := r || public._t_raises('a 1 MB line1 is rejected',                  format('insert into public.addresses (user_id, full_name, line1, city, region, postal_code, country) values (%L, ''n'', repeat(''x'', 1000000), ''c'', ''r'', ''1'', ''US'')', ua), '23514');
+  r := r || public._t_raises('201-char line2 is rejected',                format('insert into public.addresses (user_id, full_name, line1, line2, city, region, postal_code, country) values (%L, ''n'', ''l'', repeat(''x'', 201), ''c'', ''r'', ''1'', ''US'')', ua), '23514');
+  r := r || public._t_raises('21-char postal code is rejected',           format('insert into public.addresses (user_id, full_name, line1, city, region, postal_code, country) values (%L, ''n'', ''l'', ''c'', ''r'', repeat(''1'', 21), ''US'')', ua), '23514');
+  r := r || public._t_raises('country "usa" is rejected',                 format('insert into public.addresses (user_id, full_name, line1, city, region, postal_code, country) values (%L, ''n'', ''l'', ''c'', ''r'', ''1'', ''usa'')', ua), '23514');
+  r := r || public._t_raises('lower-case country "us" is rejected',       format('insert into public.addresses (user_id, full_name, line1, city, region, postal_code, country) values (%L, ''n'', ''l'', ''c'', ''r'', ''1'', ''us'')', ua), '23514');
+  r := r || public._t_raises('a phone with letters is rejected',          format('insert into public.addresses (user_id, full_name, line1, city, region, postal_code, country, phone) values (%L, ''n'', ''l'', ''c'', ''r'', ''1'', ''US'', ''call me maybe'')', ua), '23514');
+  r := r || public._t_raises('markup in a phone is rejected',             format('insert into public.addresses (user_id, full_name, line1, city, region, postal_code, country, phone) values (%L, ''n'', ''l'', ''c'', ''r'', ''1'', ''US'', ''<script>alert(1)</script>'')', ua), '23514');
+  r := r || public._t_raises('UPDATE to an oversize value is rejected too', format('update public.addresses set line1 = repeat(''x'', 201) where user_id = %L', ua), '23514');
+  -- the cap: A has 2 now (the fixture plus the valid one above); fill to exactly 20
+  for i in 1..18 loop
+    insert into public.addresses (user_id, full_name, line1, city, region, postal_code, country) values (ua, 'Filler', 'filler ' || i, 'c', 'r', '1', 'US');
+  end loop;
+  r := r || public._t_check('A can reach exactly 20 addresses',            public._t_count('select 1 from public.addresses') = 20);
+  r := r || public._t_raises('the 21st address is rejected',              format('insert into public.addresses (user_id, full_name, line1, city, region, postal_code, country) values (%L, ''n'', ''l'', ''c'', ''r'', ''1'', ''US'')', ua), 'P0001');
+  r := r || public._t_check('...and deleting one frees a slot',            public._t_rows(format('delete from public.addresses where user_id = %L and line1 = ''filler 1''', ua)) = 1
+                                                                          and public._t_rows(format('insert into public.addresses (user_id, full_name, line1, city, region, postal_code, country) values (%L, ''n'', ''l'', ''c'', ''r'', ''1'', ''US'')', ua)) = 1);
+
   -- CATALOG: readable, never writable by clients
   r := r || public._t_check('A reads active products (2)',                public._t_count(format('select 1 from public.products where category_slug = ''rls-test''')) = 2);
   r := r || public._t_check('A cannot see inactive product',              public._t_count(format('select 1 from public.products where id = %L', p2)) = 0);
@@ -201,6 +223,7 @@ begin
   r := r || public._t_check('B sees only its own profile',                public._t_count('select 1 from public.profiles') = 1
                                                                           and public._t_count(format('select 1 from public.profiles where id = %L', ua)) = 0);
   r := r || public._t_check('B updates 0 of A''s profiles',               public._t_rows(format('update public.profiles set full_name = ''pwned'' where id = %L', ua)) = 0);
+  r := r || public._t_check('B can still add an address (A hitting the cap does not affect B)', public._t_rows(format('insert into public.addresses (user_id, full_name, line1, city, region, postal_code, country) values (%L, ''B Person'', ''3 B Ok St'', ''Bcity'', ''BR'', ''22222'', ''US'')', ub)) = 1);
   reset role;
 
   ---------------------------------------------------------------------------
@@ -299,6 +322,12 @@ begin
   r := r || public._t_check('merge_cart: authenticated may execute, anon may not',
     has_function_privilege('authenticated', 'public.merge_cart(jsonb)', 'execute')
     and not has_function_privilege('anon', 'public.merge_cart(jsonb)', 'execute'));
+  r := r || public._t_check('the address-limit trigger exists and is not callable by clients',
+    exists (select 1 from pg_trigger t where t.tgname = 'addresses_enforce_limit' and not t.tgisinternal)
+    and not has_function_privilege('anon', 'public.enforce_address_limit()', 'execute')
+    and not has_function_privilege('authenticated', 'public.enforce_address_limit()', 'execute'));
+  r := r || public._t_check('orders.shipping_address has a size guard',
+    exists (select 1 from pg_constraint where conname = 'orders_shipping_address_size'));
   r := r || public._t_check('no views in public (views can bypass RLS)',
     (select count(*) from pg_views where schemaname = 'public') = 0);
 

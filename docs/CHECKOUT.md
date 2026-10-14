@@ -26,6 +26,14 @@ So it is built defensively:
 
 Everything is one transaction: any failure rolls back **all** of it (no order, stock untouched, cart intact).
 
+### Address limits live in the database, not just the form
+
+Row Level Security lets a signed-in user write their own rows through the REST API directly, bypassing any server
+action. So the limits are enforced by the database itself (`supabase/migrations/20261015090000_address_limits.sql`):
+CHECK constraints on every column (lengths, ISO country code, phone format), a trigger capping each user at 20
+addresses (serialised per user with an advisory lock so concurrent inserts can't both pass), and a 4 KB size guard
+on `orders.shipping_address`. The server action validates the same rules first so users get friendly messages.
+
 ### What an order stores (snapshots)
 
 `orders`: subtotal / shipping / tax / total, `shipping_address` as JSON (copied from the address),

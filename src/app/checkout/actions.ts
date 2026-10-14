@@ -5,7 +5,8 @@ import { requireUser } from "@/lib/auth";
 import { isCountryCode } from "@/lib/countries";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const PHONE_RE = /^[0-9+()\-.\s]{5,30}$/;
+// Must match the addresses_phone_fmt CHECK constraint (a literal space only: no tabs/newlines).
+const PHONE_RE = /^[0-9+()\-. ]{5,30}$/;
 const MAX_ADDRESSES = 20;
 
 // ---------------------------------------------------------------------------
@@ -88,6 +89,13 @@ export async function addAddress(_prev: AddressState, formData: FormData): Promi
     .select("id")
     .single();
   if (error) {
+    // The database enforces its own limits (REST can bypass this action), so a race at the cap lands here.
+    if (error.message === "address_limit_reached") {
+      return { error: `You can save up to ${MAX_ADDRESSES} addresses. Delete one first.`, values };
+    }
+    if (error.code === "23514") {
+      return { error: "One of those values is too long or in the wrong format. Please check it and try again.", values };
+    }
     console.error("Address insert failed:", error.message);
     return { error: "Couldn't save the address. Please try again.", values };
   }

@@ -59,9 +59,14 @@ begin
   ---------------------------------------------------------------------------
   -- Fixtures (as the privileged role)
   ---------------------------------------------------------------------------
-  insert into auth.users (id, aud, role, email) values
-    (ua, 'authenticated', 'authenticated', 'a@rls-test.local'),
-    (ub, 'authenticated', 'authenticated', 'b@rls-test.local');
+  -- The signup trigger creates a profile for each of these (names come from
+  -- user-controlled metadata, so C and D probe truncation and blank handling).
+  insert into auth.users (id, aud, role, email, raw_user_meta_data) values
+    (ua, 'authenticated', 'authenticated', 'a@rls-test.local', '{"full_name":"  Alice  "}'),
+    (ub, 'authenticated', 'authenticated', 'b@rls-test.local', '{"full_name":"Bob"}'),
+    ('00000000-0000-0000-0000-00000000000c', 'authenticated', 'authenticated', 'c@rls-test.local',
+       json_build_object('full_name', repeat('x', 300))::jsonb),
+    ('00000000-0000-0000-0000-00000000000d', 'authenticated', 'authenticated', 'd@rls-test.local', '{"full_name":"   "}');
 
   insert into public.categories (slug, name) values ('rls-test', 'RLS Test');
   insert into public.products (id, slug, title, category_slug, price_cents, stock, is_active) values
@@ -81,6 +86,10 @@ begin
   insert into public.order_items (order_id, user_id, product_id, title_snapshot, unit_price_cents, quantity) values
     (oa, ua, p1, 'Active one', 1000, 1),
     (ob, ub, p3, 'Active two',  500, 1);
+
+  -- Checked before any test edits the rows: the signup trigger's own output.
+  r := r || public._t_check('signup trigger trimmed "  Alice  " to "Alice"',
+    (select full_name from public.profiles where id = ua) = 'Alice');
 
   ---------------------------------------------------------------------------
   -- Attacker: signed-in user A
@@ -139,6 +148,20 @@ begin
   r := r || public._t_raises('A cannot INSERT a review',                  format('insert into public.reviews (product_id, author_name, rating) values (%L, ''shill'', 5)', p1), '42501');
   r := r || public._t_raises('A cannot INSERT a product image',           format('insert into public.product_images (product_id, path, position) values (%L, ''evil.png'', 9)', p1), '42501');
   r := r || public._t_raises('A cannot UPLOAD to the product-images bucket', 'insert into storage.objects (bucket_id, name) values (''product-images'', ''evil.png'')', '42501');
+
+  -- PROFILES
+  r := r || public._t_check('A sees exactly 1 profile (own)',             public._t_count('select 1 from public.profiles') = 1);
+  r := r || public._t_check('A sees 0 of B''s profile',                   public._t_count(format('select 1 from public.profiles where id = %L', ub)) = 0);
+  r := r || public._t_check('A updates 0 of B''s profiles',               public._t_rows(format('update public.profiles set full_name = ''pwned'' where id = %L', ub)) = 0);
+  r := r || public._t_check('A can update own full_name',                 public._t_rows(format('update public.profiles set full_name = ''Alice B'' where id = %L', ua)) = 1);
+  r := r || public._t_raises('A cannot change own profile id',            format('update public.profiles set id = %L where id = %L', ub, ua), '42501');
+  r := r || public._t_raises('A cannot change created_at',                format('update public.profiles set created_at = now() - interval ''10 years'' where id = %L', ua), '42501');
+  r := r || public._t_raises('A cannot INSERT a profile',                 format('insert into public.profiles (id, full_name) values (%L, ''x'')', gen_random_uuid()), '42501');
+  r := r || public._t_raises('A cannot DELETE own profile',               format('delete from public.profiles where id = %L', ua), '42501');
+  r := r || public._t_raises('A cannot DELETE B''s profile',              format('delete from public.profiles where id = %L', ub), '42501');
+  r := r || public._t_raises('empty full_name violates check',            format('update public.profiles set full_name = '''' where id = %L', ua), '23514');
+  r := r || public._t_raises('101-char full_name violates check',         format('update public.profiles set full_name = repeat(''x'', 101) where id = %L', ua), '23514');
+  r := r || public._t_raises('A cannot call the signup trigger function', 'select public.handle_new_user()', '42501');
   reset role;
 
   ---------------------------------------------------------------------------
@@ -152,6 +175,9 @@ begin
   r := r || public._t_check('B sees 0 of A''s orders',                    public._t_count(format('select 1 from public.orders where id = %L', oa)) = 0);
   r := r || public._t_check('B sees 0 of A''s order items',               public._t_count(format('select 1 from public.order_items where order_id = %L', oa)) = 0);
   r := r || public._t_check('B sees 0 of A''s addresses',                 public._t_count(format('select 1 from public.addresses where user_id = %L', ua)) = 0);
+  r := r || public._t_check('B sees only its own profile',                public._t_count('select 1 from public.profiles') = 1
+                                                                          and public._t_count(format('select 1 from public.profiles where id = %L', ua)) = 0);
+  r := r || public._t_check('B updates 0 of A''s profiles',               public._t_rows(format('update public.profiles set full_name = ''pwned'' where id = %L', ua)) = 0);
   reset role;
 
   ---------------------------------------------------------------------------
@@ -162,7 +188,8 @@ begin
   r := r || public._t_check('no-sub token sees 0 cart rows',              public._t_count('select 1 from public.cart_items') = 0);
   r := r || public._t_check('no-sub token sees 0 orders',                 public._t_count('select 1 from public.orders') = 0);
   r := r || public._t_check('no-sub token sees 0 addresses',              public._t_count('select 1 from public.addresses') = 0);
-  r := r || public._t_raises('no-sub token cannot insert a cart row',     format('insert into public.cart_items (user_id, product_id, quantity) values (%L, %L, 1)', ua, p3), '42501');
+  r := r || public._t_check('no-sub token sees 0 profiles',               public._t_count('select 1 from public.profiles') = 0);
+  r := r || public._t_raises('no-sub token cannot insert a cart row',    format('insert into public.cart_items (user_id, product_id, quantity) values (%L, %L, 1)', ua, p3), '42501');
   reset role;
 
   ---------------------------------------------------------------------------
@@ -174,6 +201,8 @@ begin
   r := r || public._t_raises('anon cannot read orders',                   'select 1 from public.orders', '42501');
   r := r || public._t_raises('anon cannot read order items',              'select 1 from public.order_items', '42501');
   r := r || public._t_raises('anon cannot read addresses',                'select 1 from public.addresses', '42501');
+  r := r || public._t_raises('anon cannot read profiles',                 'select 1 from public.profiles', '42501');
+  r := r || public._t_raises('anon cannot update profiles',               'update public.profiles set full_name = ''x''', '42501');
   r := r || public._t_check('anon reads active products (2)',             public._t_count('select 1 from public.products where category_slug = ''rls-test''') = 2);
   r := r || public._t_check('anon cannot see inactive product',           public._t_count(format('select 1 from public.products where id = %L', p2)) = 0);
   r := r || public._t_raises('anon cannot INSERT a product',              'insert into public.products (slug, title, category_slug, price_cents) values (''evil'', ''evil'', ''rls-test'', 1)', '42501');
@@ -215,9 +244,29 @@ begin
   r := r || public._t_check('every public table has RLS enabled',
     (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity) = 0);
-  r := r || public._t_check('no SECURITY DEFINER functions in public yet (RPCs come later)',
+  -- The signup trigger works end to end (profiles were created by the trigger, not by us).
+  r := r || public._t_check('AFTER: A''s own edit applied, nothing else changed',
+    (select full_name from public.profiles where id = ua) = 'Alice B');
+  r := r || public._t_check('trigger created B''s profile',
+    (select full_name from public.profiles where id = ub) = 'Bob');
+  r := r || public._t_check('trigger truncated a 300-char name to 100',
+    (select char_length(full_name) from public.profiles where id = '00000000-0000-0000-0000-00000000000c') = 100);
+  r := r || public._t_check('trigger stored a whitespace-only name as NULL',
+    (select full_name is null from public.profiles where id = '00000000-0000-0000-0000-00000000000d'));
+  r := r || public._t_check('every auth user got exactly one profile',
+    (select count(*) from auth.users u left join public.profiles p on p.id = u.id where p.id is null) = 0);
+  r := r || public._t_check('AFTER: B''s profile name intact',
+    (select full_name from public.profiles where id = ub) = 'Bob');
+
+  -- SECURITY DEFINER functions are an RLS bypass by design, so the allow-list is explicit.
+  r := r || public._t_check('only handle_new_user is SECURITY DEFINER in public',
     (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-      where n.nspname = 'public' and p.prosecdef) = 0);
+      where n.nspname = 'public' and p.prosecdef and p.proname <> 'handle_new_user') = 0);
+  r := r || public._t_check('handle_new_user pins search_path',
+    exists (select 1 from pg_proc p where p.proname = 'handle_new_user' and p.proconfig @> array['search_path=""']));
+  r := r || public._t_check('handle_new_user is not executable by anon or authenticated',
+    not has_function_privilege('anon', 'public.handle_new_user()', 'execute')
+    and not has_function_privilege('authenticated', 'public.handle_new_user()', 'execute'));
   r := r || public._t_check('no views in public (views can bypass RLS)',
     (select count(*) from pg_views where schemaname = 'public') = 0);
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { CATEGORIES } from "@/lib/site";
+import { AccountLink, AccountMenu } from "./AccountMenu";
 import { Logo } from "./Logo";
 import { SearchBar } from "./SearchBar";
 import { SearchForm } from "./SearchForm";
@@ -24,16 +25,10 @@ export function Header() {
           </div>
 
           <div className="order-2 ml-auto flex items-center gap-1 sm:order-3 sm:ml-0">
-          <Link
-            href="/signin"
-            className="rounded px-2 py-1 text-xs leading-tight hover:outline hover:outline-1 hover:outline-white/60"
-          >
-            <span className="block text-zinc-300">Hello, sign in</span>
-            <span className="block text-sm font-bold">
-              <span className="sm:hidden">Account</span>
-              <span className="hidden sm:inline">Account &amp; Orders</span>
-            </span>
-          </Link>
+          {/* Reads the session (dynamic); the signed-out look is the fallback. */}
+          <Suspense fallback={<AccountLink name={null} />}>
+            <AccountMenu />
+          </Suspense>
 
           <Link
             href="/cart"

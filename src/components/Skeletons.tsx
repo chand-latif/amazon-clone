@@ -42,6 +42,21 @@ export function HomeSkeleton() {
   );
 }
 
+export function AuthSkeleton() {
+  return (
+    <div className="mx-auto w-full max-w-sm py-6" role="status" aria-label="Loading">
+      <div className="space-y-4 rounded border border-zinc-300 bg-surface p-6 shadow-sm" aria-hidden>
+        <Bar className="h-7 w-32" />
+        <Bar className="h-9 w-full" />
+        <Bar className="h-4 w-20" />
+        <Bar className="h-9 w-full" />
+        <Bar className="h-10 w-full rounded-full" />
+      </div>
+      <span className="sr-only">Loading…</span>
+    </div>
+  );
+}
+
 export function ProductPageSkeleton() {
   return (
     <div className="space-y-4" role="status" aria-label="Loading product">

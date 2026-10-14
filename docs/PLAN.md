@@ -15,7 +15,8 @@ Goal: one polished, complete shopping loop. Browse → search → PDP → cart �
 - Slice 1 (schema, RLS, seed): migration applied to the Supabase project; RLS attack test passes (70/70); seed script written. Seed run and verified idempotent: 81 products, 217 images in Storage, 243 reviews (`npm run seed`; needs `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`).
 - Slices 2 + 3 were built together: home page (hero carousel, deals strip, category rows) and `/s` search with URL-driven filters (category, price, rating), sort and pagination. Category browse is `/s?c=<slug>`; there is no separate `/c/[slug]` route.
 - Slice 4 (product detail page, `/p/[slug]`): done. Gallery, price/savings, rating summary + stored reviews, stock status, quantity selector, buy box, related row, JSON-LD. All 81 products are prerendered. **Add to Cart / Buy Now only validate and show a "not connected yet" notice** until Slice 5 wires the cart. Unknown slugs show the not-found page with `noindex` but return HTTP 200 (Cache Components has no `dynamicParams = false`). No rating histogram: only 3 real reviews are stored per product, so a distribution chart would be invented.
-- Next: Slice 5 (guest cart).
+- Slice 6 (auth) was built **before** Slice 5 (at the user's request): email+password and magic-link sign-in, sign-up, sign-out, `profiles` table + signup trigger, `/account` (edit name) and `/orders` (empty/list states) behind protection, redirect-back with a strict validator. Setup steps for the Supabase dashboard are in `docs/AUTH.md`. Not yet verified end to end: a real email delivery (sign-up confirmation, magic-link send, and the PKCE `?code=` callback), because the project's built-in SMTP only mails org members.
+- Next: Slice 5 (guest cart), then Slice 7 (cart sync/merge on login, which can now use the auth session).
 
 ## Decisions still open (resolve before the slice that needs them)
 | # | Question | Needed by | Default if unanswered |

@@ -7,6 +7,7 @@ import {
   parseGuestCart,
   sanitizeLines,
   serializeGuestCart,
+  subtractLines,
   withQuantity,
   type CartLine,
 } from "./storage";
@@ -33,9 +34,15 @@ export type CartState = {
   error: string | null;
   /** Informational, e.g. a merge that will be retried. */
   notice: string | null;
+  /**
+   * The signed-in cart could not be read, so `lines` is NOT the real cart. Writes
+   * are refused until a reload succeeds; otherwise "add one" would overwrite a
+   * quantity we never saw.
+   */
+  loadFailed: boolean;
 };
 
-const INITIAL: CartState = { status: "loading", mode: null, lines: [], error: null, notice: null };
+const INITIAL: CartState = { status: "loading", mode: null, lines: [], error: null, notice: null, loadFailed: false };
 
 let state: CartState = INITIAL;
 const listeners = new Set<() => void>();
@@ -140,7 +147,7 @@ export async function configureAuth(userId: string | null): Promise<void> {
   if (userId === null) {
     // Signed out (or never signed in). The account's cart stays in the database;
     // nothing is copied to this browser, so a shared computer doesn't keep it.
-    setState({ mode: "guest", lines: readGuest(), status: "ready", error: null });
+    setState({ mode: "guest", lines: readGuest(), status: "ready", error: null, loadFailed: false });
     markReady();
     return;
   }
@@ -170,7 +177,9 @@ async function mergeGuestCartIntoAccount(): Promise<void> {
       setState({ notice: "We couldn't add your saved items to your account yet. They're still on this device and we'll retry." });
       return;
     }
-    writeGuest([]);
+    // Remove only what was merged. Something added to the guest cart while the
+    // request was in flight must not be wiped; it stays for the next sign-in.
+    writeGuest(subtractLines(readGuest(), local));
   };
 
   try {
@@ -188,11 +197,17 @@ async function loadFromDb(gen: number): Promise<void> {
   try {
     const lines = await fetchDbLines();
     if (gen !== generation) return;
-    setState({ mode: "user", lines, status: "ready", error: null });
+    setState({ mode: "user", lines, status: "ready", error: null, loadFailed: false });
   } catch (error) {
     if (gen !== generation) return;
     console.error("Cart load failed:", error);
-    setState({ mode: "user", lines: [], status: "ready", error: "We couldn't load your cart. Please refresh the page." });
+    setState({
+      mode: "user",
+      lines: [],
+      status: "ready",
+      loadFailed: true,
+      error: "We couldn't load your cart. Please refresh the page.",
+    });
   } finally {
     markReady();
   }
@@ -204,7 +219,9 @@ async function refreshFromDb(): Promise<void> {
   const gen = generation;
   try {
     const lines = await fetchDbLines();
-    if (gen === generation && chains.size === 0) setState({ lines });
+    if (gen === generation && chains.size === 0) {
+      setState({ lines, error: state.loadFailed ? null : state.error, loadFailed: false });
+    }
   } catch {
     // Keep what's on screen; the next focus will retry.
   }
@@ -225,10 +242,44 @@ async function whenReady(): Promise<void> {
 // Actions
 // ---------------------------------------------------------------------------
 
-/** Sets a line's quantity (0 removes it). Optimistic, then persisted. */
-async function commit(productId: string, quantity: number): Promise<void> {
-  await whenReady();
+/**
+ * Signed-in carts only: make sure `lines` is the real cart before changing it.
+ * Returns false (and tells the user) if it still can't be read.
+ */
+async function ensureLoaded(): Promise<boolean> {
+  if (state.mode !== "user" || !state.loadFailed) return true;
+  const gen = generation;
+  try {
+    const lines = await fetchDbLines();
+    if (gen !== generation) return false;
+    setState({ lines, loadFailed: false, error: null });
+    return true;
+  } catch {
+    setState({ error: "We couldn't load your cart, so it wasn't changed. Please check your connection and try again." });
+    return false;
+  }
+}
 
+/** After a failed write, put back just that line as the database has it (other in-flight edits are left alone). */
+async function rollbackLine(productId: string): Promise<void> {
+  const gen = generation;
+  try {
+    const dbLines = await fetchDbLines();
+    if (gen !== generation) return;
+    const actual = dbLines.find((l) => l.productId === productId)?.quantity ?? 0;
+    setState({ lines: withQuantity(state.lines, productId, actual) });
+  } catch {
+    // Can't reach the database; the error banner is already showing.
+  }
+}
+
+/**
+ * Applies a change to the screen and persists it. Everything up to the first
+ * `await` is synchronous on purpose: callers compute from `state.lines` and
+ * this commits it in the same tick, so two quick clicks can't both start from
+ * the same old quantity.
+ */
+function applyChange(productId: string, quantity: number): Promise<boolean> {
   const after = withQuantity(state.lines, productId, quantity);
   setState({ lines: after, error: null });
 
@@ -236,18 +287,27 @@ async function commit(productId: string, quantity: number): Promise<void> {
     if (!writeGuest(after)) {
       setState({ notice: "Your cart couldn't be saved in this browser (storage is unavailable or full)." });
     }
-    return;
+    return Promise.resolve(true);
   }
 
   const userId = currentUserId;
-  if (!userId) return;
-  try {
-    await enqueue(productId, () => (quantity < 1 ? dbDelete(productId) : dbUpsert(userId, productId, quantity)));
-  } catch (error) {
-    console.error("Cart update failed:", error);
-    setState({ error: "We couldn't update your cart. Please try again." });
-    await refreshFromDb(); // snap back to what the database really has
-  }
+  if (!userId) return Promise.resolve(true);
+  return enqueue(productId, () => (quantity < 1 ? dbDelete(productId) : dbUpsert(userId, productId, quantity))).then(
+    () => true,
+    async (error) => {
+      console.error("Cart update failed:", error);
+      setState({ error: "We couldn't update your cart. Please try again." });
+      await rollbackLine(productId); // snap this line back to what the database really has
+      return false;
+    },
+  );
+}
+
+/** Sets a line's quantity (0 removes it). Optimistic, then persisted. */
+async function commit(productId: string, quantity: number): Promise<boolean> {
+  await whenReady();
+  if (!(await ensureLoaded())) return false;
+  return applyChange(productId, quantity);
 }
 
 export type AddResult = {
@@ -262,24 +322,28 @@ export type AddResult = {
 /**
  * Adds `quantity` units. `limit` is the most this product can have in a cart
  * (the caller passes min(10, stock)); it can never exceed 10.
+ * Throws if the change could not be saved, so callers (Buy Now) don't carry on.
  */
 export async function addToCart(productId: string, quantity = 1, limit: number = MAX_QTY): Promise<AddResult> {
   await whenReady();
+  if (!(await ensureLoaded())) throw new Error("cart_unavailable");
+  // No await between reading the current quantity and applying the new one.
   const previous = state.lines.find((l) => l.productId === productId)?.quantity ?? 0;
   const wanted = previous + clampQty(quantity);
   // Never silently reduce what's already there (stock may have dropped since).
   const next = Math.max(clampQty(wanted, limit), previous);
-  await commit(productId, next);
+  const saved = await applyChange(productId, next);
+  if (!saved) throw new Error("cart_update_failed");
   return { previous, quantity: next, clamped: wanted > next };
 }
 
 /** Sets an exact quantity; anything below 1 removes the line. */
-export function setCartQuantity(productId: string, quantity: number, limit: number = MAX_QTY): Promise<void> {
-  return commit(productId, quantity < 1 ? 0 : clampQty(quantity, limit));
+export async function setCartQuantity(productId: string, quantity: number, limit: number = MAX_QTY): Promise<void> {
+  await commit(productId, quantity < 1 ? 0 : clampQty(quantity, limit));
 }
 
-export function removeFromCart(productId: string): Promise<void> {
-  return commit(productId, 0);
+export async function removeFromCart(productId: string): Promise<void> {
+  await commit(productId, 0);
 }
 
 /** Re-reads the signed-in cart now (e.g. right after checkout emptied it on the server). */

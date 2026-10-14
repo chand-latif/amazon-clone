@@ -78,3 +78,18 @@ export function withQuantity(lines: CartLine[], productId: string, quantity: num
   next[existing] = line;
   return next;
 }
+
+/**
+ * `current` minus `removed`, per product: a line whose quantity is no more than what
+ * was removed disappears; a larger one keeps the difference. Used after a guest
+ * cart has been merged, so items added meanwhile are not lost.
+ */
+export function subtractLines(current: CartLine[], removed: CartLine[]): CartLine[] {
+  const gone = new Map(removed.map((l) => [l.productId, l.quantity]));
+  const out: CartLine[] = [];
+  for (const line of current) {
+    const left = line.quantity - (gone.get(line.productId) ?? 0);
+    if (left >= 1) out.push({ productId: line.productId, quantity: clampQty(left) });
+  }
+  return out;
+}

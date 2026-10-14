@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 export type HeroSlide = {
   id: string;
@@ -66,6 +66,10 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
 
   const go = (i: number) => setIndex(((i % count) + count) % count);
 
+  // Phones: the prev/next arrows would sit on top of the slide text, so they are hidden there
+  // and the slides can be swiped instead (the dots remain as buttons).
+  const touchStartX = useRef<number | null>(null);
+
   return (
     <section
       aria-roledescription="carousel"
@@ -76,6 +80,16 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
       onFocus={() => setFocused(true)}
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget)) setFocused(false);
+      }}
+      onTouchStart={(e) => {
+        touchStartX.current = e.touches[0]?.clientX ?? null;
+      }}
+      onTouchEnd={(e) => {
+        const start = touchStartX.current;
+        touchStartX.current = null;
+        const end = e.changedTouches[0]?.clientX;
+        if (start === null || end === undefined || Math.abs(end - start) < 50) return;
+        go(end < start ? index + 1 : index - 1);
       }}
       onKeyDown={(e) => {
         if (e.key === "ArrowLeft") go(index - 1);
@@ -98,13 +112,14 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
             aria-hidden={i !== index}
             className={`relative flex min-h-64 w-full shrink-0 items-center bg-gradient-to-r px-6 py-8 text-white sm:min-h-80 sm:px-12 ${THEMES[s.theme % THEMES.length]}`}
           >
-            <div className="z-10 max-w-md">
+            {/* On phones keep the text clear of the image on the right. */}
+            <div className="z-10 max-w-[55%] sm:max-w-md">
               <p className="text-xs font-semibold uppercase tracking-widest text-accent">{s.eyebrow}</p>
               <h2 className="mt-2 text-2xl font-bold leading-tight sm:text-4xl">{s.headline}</h2>
               <p className="mt-2 text-sm text-white/85 sm:text-base">{s.subline}</p>
               <Link
                 href={s.href}
-                className="mt-5 inline-block rounded-full bg-accent px-6 py-2 text-sm font-semibold text-navy hover:bg-accent-hover"
+                className="mt-5 inline-block whitespace-nowrap rounded-full bg-accent px-4 py-2 text-xs font-semibold sm:px-6 sm:text-sm text-navy hover:bg-accent-hover"
               >
                 {s.cta}
               </Link>
@@ -131,7 +146,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
             type="button"
             onClick={() => go(index - 1)}
             aria-label="Previous slide"
-            className="absolute left-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/35 text-white hover:bg-black/55"
+            className="absolute left-2 top-1/2 hidden h-10 w-10 -translate-y-1/2 items-center justify-center sm:flex rounded-full bg-black/35 text-white hover:bg-black/55"
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
               <path d="m15 5-7 7 7 7" strokeLinecap="round" strokeLinejoin="round" />
@@ -141,7 +156,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
             type="button"
             onClick={() => go(index + 1)}
             aria-label="Next slide"
-            className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/35 text-white hover:bg-black/55"
+            className="absolute right-2 top-1/2 hidden h-10 w-10 -translate-y-1/2 items-center justify-center sm:flex rounded-full bg-black/35 text-white hover:bg-black/55"
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
               <path d="m9 5 7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />

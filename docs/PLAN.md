@@ -10,6 +10,12 @@ Goal: one polished, complete shopping loop. Browse → search → PDP → cart �
 - Every table has RLS enabled with explicit policies. Run Supabase security advisors after each schema change.
 - Each slice is deployed to a Vercel preview, so every slice is shippable.
 
+## Progress
+- Slice 0 (scaffold, shell): done.
+- Slice 1 (schema, RLS, seed): migration applied to the Supabase project; RLS attack test passes (70/70); seed script written. **Seed not yet run** (needs `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`, then `npm run seed`).
+- Slices 2 + 3 were built together: home page (hero carousel, deals strip, category rows) and `/s` search with URL-driven filters (category, price, rating), sort and pagination. Category browse is `/s?c=<slug>`; there is no separate `/c/[slug]` route.
+- Next: Slice 4 (product detail page at `/p/[slug]`). Product cards already link there, so it 404s until then.
+
 ## Decisions still open (resolve before the slice that needs them)
 | # | Question | Needed by | Default if unanswered |
 |---|---|---|---|

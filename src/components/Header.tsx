@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { CATEGORIES } from "@/lib/site";
 import { Logo } from "./Logo";
 import { SearchBar } from "./SearchBar";
+import { SearchForm } from "./SearchForm";
 
 // Placeholder until the cart exists; the account state arrives with auth.
 const CART_COUNT = 0;
@@ -15,7 +17,10 @@ export function Header() {
           <Logo />
 
           <div className="order-3 w-full min-w-0 sm:order-2 sm:w-auto sm:flex-1">
-            <SearchBar />
+            {/* SearchBar reads the URL (client); the static form is its fallback. */}
+            <Suspense fallback={<SearchForm />}>
+              <SearchBar />
+            </Suspense>
           </div>
 
           <div className="order-2 ml-auto flex items-center gap-1 sm:order-3 sm:ml-0">
@@ -54,13 +59,13 @@ export function Header() {
       <nav aria-label="Categories" className="bg-navy-2 text-sm text-white">
         <ul className="mx-auto flex max-w-[1500px] gap-1 overflow-x-auto px-3 py-1.5 whitespace-nowrap">
           <li>
-            <Link href="/s?c=all" className="block rounded px-2 py-1 font-semibold hover:outline hover:outline-1 hover:outline-white/60">
+            <Link href="/s" className="block rounded px-2 py-1 font-semibold hover:outline hover:outline-1 hover:outline-white/60">
               All products
             </Link>
           </li>
           {CATEGORIES.map((c) => (
             <li key={c.slug}>
-              <Link href={`/c/${c.slug}`} className="block rounded px-2 py-1 hover:outline hover:outline-1 hover:outline-white/60">
+              <Link href={`/s?c=${c.slug}`} className="block rounded px-2 py-1 hover:outline hover:outline-1 hover:outline-white/60">
                 {c.name}
               </Link>
             </li>

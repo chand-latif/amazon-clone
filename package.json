@@ -10,7 +10,8 @@
     "typecheck": "next typegen && tsc --noEmit",
     "seed": "node --env-file=.env.local scripts/seed.mts",
     "seed:dry": "node scripts/seed.mts --dry-run",
-    "test-user": "node --env-file=.env.local scripts/test-user.mts"
+    "test-user": "node --env-file=.env.local scripts/test-user.mts",
+    "test:race": "node --env-file=.env.local scripts/test-place-order-race.mts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

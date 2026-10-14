@@ -149,6 +149,7 @@ begin
   r := r || public._t_raises('A cannot INSERT an order item',             format('insert into public.order_items (order_id, user_id, title_snapshot, unit_price_cents, quantity) values (%L, %L, ''free'', 0, 1)', oa, ua), '42501');
   r := r || public._t_raises('A cannot UPDATE own order item price',      format('update public.order_items set unit_price_cents = 1 where order_id = %L', oa), '42501');
   r := r || public._t_raises('A cannot DELETE B''s order item',           format('delete from public.order_items where order_id = %L', ob), '42501');
+  r := r || public._t_raises('A cannot forge an idempotency key onto own order', format('update public.orders set idempotency_key = gen_random_uuid() where id = %L', oa), '42501');
 
   -- ADDRESSES
   r := r || public._t_check('A sees exactly 1 address (own)',             public._t_count('select 1 from public.addresses') = 1);
@@ -164,6 +165,7 @@ begin
   r := r || public._t_check('A sees reviews of active product',           public._t_count(format('select 1 from public.reviews where product_id = %L', p1)) = 1);
   r := r || public._t_raises('A cannot INSERT a product',                 'insert into public.products (slug, title, category_slug, price_cents) values (''evil'', ''evil'', ''rls-test'', 1)', '42501');
   r := r || public._t_raises('A cannot UPDATE a product price',           format('update public.products set price_cents = 1 where id = %L', p1), '42501');
+  r := r || public._t_raises('A cannot UPDATE product stock directly',    format('update public.products set stock = 999 where id = %L', p1), '42501');
   r := r || public._t_raises('A cannot DELETE a product',                 format('delete from public.products where id = %L', p1), '42501');
   r := r || public._t_raises('A cannot INSERT a category',                'insert into public.categories (slug, name) values (''evil'', ''evil'')', '42501');
   r := r || public._t_raises('A cannot INSERT a review',                  format('insert into public.reviews (product_id, author_name, rating) values (%L, ''shill'', 5)', p1), '42501');
@@ -244,7 +246,7 @@ begin
   r := r || public._t_check('AFTER: no cart row was moved to B',
     (select count(*) from public.cart_items where user_id = ub) = 2);
   r := r || public._t_check('AFTER: orders untouched (2 rows, totals 1000/500, statuses placed)',
-    (select count(*) from public.orders where (id = oa and total_cents = 1000 and status = 'placed')
+    (select count(*) from public.orders where (id = oa and total_cents = 1000 and status = 'placed' and idempotency_key is null)
                                            or (id = ob and total_cents = 500  and status = 'placed')) = 2
     and (select count(*) from public.orders) = 2);
   r := r || public._t_check('AFTER: order item prices untouched',
@@ -253,9 +255,10 @@ begin
     and (select count(*) from public.order_items) = 2);
   r := r || public._t_check('AFTER: addresses untouched',
     (select count(*) from public.addresses where line1 in ('1 A St', '2 B St')) = 2);
-  r := r || public._t_check('AFTER: catalog untouched (3 products, price 1000, no evil rows)',
+  r := r || public._t_check('AFTER: catalog untouched (3 products, price and stock intact, no evil rows)',
     (select count(*) from public.products where category_slug = 'rls-test') = 3
     and (select price_cents from public.products where id = p1) = 1000
+    and (select stock from public.products where id = p1) = 5
     and (select count(*) from public.products where slug = 'evil') = 0
     and (select count(*) from public.categories where slug = 'evil') = 0
     and (select count(*) from public.reviews where author_name = 'shill') = 0
@@ -282,9 +285,9 @@ begin
     (select full_name from public.profiles where id = ub) = 'Bob');
 
   -- SECURITY DEFINER functions are an RLS bypass by design, so the allow-list is explicit.
-  r := r || public._t_check('only handle_new_user is SECURITY DEFINER in public',
+  r := r || public._t_check('only the two reviewed functions (handle_new_user, place_order) are SECURITY DEFINER in public',
     (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-      where n.nspname = 'public' and p.prosecdef and p.proname <> 'handle_new_user') = 0);
+      where n.nspname = 'public' and p.prosecdef and p.proname not in ('handle_new_user', 'place_order')) = 0);
   r := r || public._t_check('handle_new_user pins search_path',
     exists (select 1 from pg_proc p where p.proname = 'handle_new_user' and p.proconfig @> array['search_path=""']));
   r := r || public._t_check('handle_new_user is not executable by anon or authenticated',

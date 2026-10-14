@@ -282,6 +282,11 @@ export function removeFromCart(productId: string): Promise<void> {
   return commit(productId, 0);
 }
 
+/** Re-reads the signed-in cart now (e.g. right after checkout emptied it on the server). */
+export function reloadCart(): Promise<void> {
+  return refreshFromDb();
+}
+
 export function dismissCartNotice() {
   if (state.notice) setState({ notice: null });
 }

@@ -159,6 +159,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          idempotency_key: string | null
           order_number: number
           payment_method: string
           shipping_address: Json
@@ -172,6 +173,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          idempotency_key?: string | null
           order_number?: never
           payment_method?: string
           shipping_address: Json
@@ -185,6 +187,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          idempotency_key?: string | null
           order_number?: never
           payment_method?: string
           shipping_address?: Json
@@ -355,6 +358,18 @@ export type Database = {
       merge_cart: {
         Args: { items: Json }
         Returns: undefined
+      }
+      place_order: {
+        Args: {
+          p_address_id: string
+          p_expected_total_cents: number
+          p_idempotency_key?: string
+        }
+        Returns: { placed_order_id: string; placed_order_number: number }[]
+      }
+      shipping_cents_for: {
+        Args: { subtotal_cents: number }
+        Returns: number
       }
     }
     Enums: {

@@ -45,29 +45,31 @@ export function SignInForm({ next, initialError }: { next: string; initialError?
       </div>
 
       {mode === "password" ? (
-        <form action={passwordAction} id="panel-password" role="tabpanel" aria-labelledby="tab-password" className="space-y-4" noValidate>
-          <input type="hidden" name="next" value={next} />
-          <Field
-            id="si-email"
-            name="email"
-            label="Email"
-            type="email"
-            autoComplete="username"
-            defaultValue={passwordState?.values?.email}
-            error={passwordState?.fieldErrors?.email}
-            required
-          />
-          <Field
-            id="si-password"
-            name="password"
-            label="Password"
-            type="password"
-            autoComplete="current-password"
-            error={passwordState?.fieldErrors?.password}
-            required
-          />
-          <SubmitButton pendingLabel="Signing in…">Sign in</SubmitButton>
-        </form>
+        <div id="panel-password" role="tabpanel" aria-labelledby="tab-password">
+          <form action={passwordAction} className="space-y-4" noValidate>
+            <input type="hidden" name="next" value={next} />
+            <Field
+              id="si-email"
+              name="email"
+              label="Email"
+              type="email"
+              autoComplete="username"
+              defaultValue={passwordState?.values?.email}
+              error={passwordState?.fieldErrors?.email}
+              required
+            />
+            <Field
+              id="si-password"
+              name="password"
+              label="Password"
+              type="password"
+              autoComplete="current-password"
+              error={passwordState?.fieldErrors?.password}
+              required
+            />
+            <SubmitButton pendingLabel="Signing in…">Sign in</SubmitButton>
+          </form>
+        </div>
       ) : linkState?.message ? (
         <p className="text-sm text-zinc-600">
           Nothing arrived? Check your spam folder, or{" "}
@@ -77,21 +79,23 @@ export function SignInForm({ next, initialError }: { next: string; initialError?
           .
         </p>
       ) : (
-        <form action={linkAction} id="panel-link" role="tabpanel" aria-labelledby="tab-link" className="space-y-4" noValidate>
-          <input type="hidden" name="next" value={next} />
-          <Field
-            id="ml-email"
-            name="email"
-            label="Email"
-            type="email"
-            autoComplete="email"
-            defaultValue={linkState?.values?.email}
-            error={linkState?.fieldErrors?.email}
-            hint="We'll email you a link that signs you in. No password needed."
-            required
-          />
-          <SubmitButton pendingLabel="Sending…">Email me a sign-in link</SubmitButton>
-        </form>
+        <div id="panel-link" role="tabpanel" aria-labelledby="tab-link">
+          <form action={linkAction} className="space-y-4" noValidate>
+            <input type="hidden" name="next" value={next} />
+            <Field
+              id="ml-email"
+              name="email"
+              label="Email"
+              type="email"
+              autoComplete="email"
+              defaultValue={linkState?.values?.email}
+              error={linkState?.fieldErrors?.email}
+              hint="We'll email you a link that signs you in. No password needed."
+              required
+            />
+            <SubmitButton pendingLabel="Sending…">Email me a sign-in link</SubmitButton>
+          </form>
+        </div>
       )}
 
       <p className="mt-6 border-t border-zinc-200 pt-4 text-center text-sm">

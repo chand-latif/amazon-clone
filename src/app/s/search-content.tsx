@@ -59,6 +59,8 @@ export async function SearchContent({ searchParams }: { searchParams: Promise<Ra
   } else {
     body = (
       <>
+        {/* Product titles are h3s, so give them an h2 to sit under (the h1 is the page heading above). */}
+        <h2 className="sr-only">Search results</h2>
         <ul className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
           {products.map((p, i) => (
             <li key={p.id}>

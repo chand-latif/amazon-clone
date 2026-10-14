@@ -70,8 +70,9 @@ export function ProductCard({
 
       <div className="mt-1 flex items-center gap-1.5 text-xs text-zinc-600">
         <StarRating rating={product.ratingAvg} />
-        <span aria-label={`${product.ratingCount.toLocaleString("en-US")} ratings`}>
+        <span>
           {product.ratingCount.toLocaleString("en-US")}
+          <span className="sr-only"> ratings</span>
         </span>
       </div>
 

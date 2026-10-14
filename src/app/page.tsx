@@ -58,6 +58,7 @@ async function HomeContent() {
 
   return (
     <div className="space-y-4">
+      <h1 className="sr-only">Shop deals and best sellers at amazon</h1>
       <HeroCarousel slides={buildSlides(data)} />
 
       {data.deals.length > 0 && (

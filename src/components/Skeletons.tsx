@@ -16,7 +16,7 @@ export function ProductCardSkeleton() {
   );
 }
 
-function RowSkeleton() {
+export function RowSkeleton() {
   return (
     <div className="rounded bg-surface p-4 shadow-sm" aria-hidden>
       <Bar className="mb-4 h-6 w-48" />
@@ -38,6 +38,28 @@ export function HomeSkeleton() {
       <RowSkeleton />
       <RowSkeleton />
       <span className="sr-only">Loading…</span>
+    </div>
+  );
+}
+
+export function ProductPageSkeleton() {
+  return (
+    <div className="space-y-4" role="status" aria-label="Loading product">
+      <Bar className="h-4 w-72" />
+      <div className="grid gap-6 rounded bg-surface p-4 shadow-sm lg:grid-cols-[minmax(0,5fr)_minmax(0,4fr)_minmax(0,3fr)]">
+        <Bar className="aspect-square w-full" />
+        <div className="space-y-3" aria-hidden>
+          <Bar className="h-7 w-full" />
+          <Bar className="h-7 w-2/3" />
+          <Bar className="h-4 w-48" />
+          <Bar className="mt-4 h-10 w-40" />
+          {Array.from({ length: 5 }, (_, i) => (
+            <Bar key={i} className="h-4 w-full" />
+          ))}
+        </div>
+        <Bar className="h-80 w-full" />
+      </div>
+      <span className="sr-only">Loading product…</span>
     </div>
   );
 }

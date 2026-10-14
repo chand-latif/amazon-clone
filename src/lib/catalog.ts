@@ -127,6 +127,102 @@ export async function getHomeData(): Promise<HomeData> {
   return { categories: cats, rows, deals };
 }
 
+export type Review = {
+  id: string;
+  authorName: string;
+  rating: number;
+  title: string | null;
+  body: string;
+  createdAt: string;
+};
+
+export type ProductDetail = ProductCard & {
+  description: string;
+  features: string[];
+  /** All image paths, primary first. */
+  imagePaths: string[];
+  categoryName: string;
+  reviews: Review[];
+};
+
+type DetailRow = Omit<CardRow, "product_images"> & {
+  description: string;
+  features: string[];
+  product_images: { path: string; position: number }[];
+  categories: { name: string } | { name: string }[] | null;
+  reviews: {
+    id: string;
+    author_name: string;
+    rating: number;
+    title: string | null;
+    body: string;
+    created_at: string;
+  }[];
+};
+
+/** Slugs to prerender at build time. Not cached: it only runs during the build. */
+export async function getProductSlugs(): Promise<string[]> {
+  const { data, error } = await createPublicClient().from("products").select("slug").order("slug").limit(1000);
+  if (error) throw new Error(`product slugs: ${error.message}`);
+  return data.map((p) => p.slug);
+}
+
+/** One product with everything the detail page needs, or null if it doesn't exist / isn't active. */
+export async function getProductBySlug(slug: string): Promise<ProductDetail | null> {
+  "use cache";
+  cacheLife("minutes");
+  cacheTag("catalog");
+
+  const { data, error } = await createPublicClient()
+    .from("products")
+    .select(
+      "id, slug, title, brand, description, features, category_slug, price_cents, list_price_cents, stock, rating_avg, rating_count, product_images(path, position), categories(name), reviews(id, author_name, rating, title, body, created_at)",
+    )
+    .eq("slug", slug)
+    .order("created_at", { referencedTable: "reviews", ascending: false })
+    .maybeSingle();
+  if (error) throw new Error(`product: ${error.message}`);
+  if (!data) return null;
+
+  const row = data as unknown as DetailRow;
+  const category = Array.isArray(row.categories) ? row.categories[0] : row.categories;
+  const images = [...row.product_images].sort((a, b) => a.position - b.position);
+
+  return {
+    ...toCard(row as unknown as CardRow),
+    description: row.description,
+    features: row.features,
+    imagePaths: images.map((i) => i.path),
+    categoryName: category?.name ?? row.category_slug,
+    reviews: row.reviews.map((r) => ({
+      id: r.id,
+      authorName: r.author_name,
+      rating: r.rating,
+      title: r.title,
+      body: r.body,
+      createdAt: r.created_at,
+    })),
+  };
+}
+
+/** Popular products from the same category, excluding the one being viewed. */
+export async function getRelatedProducts(categorySlug: string, excludeId: string): Promise<ProductCard[]> {
+  "use cache";
+  cacheLife("minutes");
+  cacheTag("catalog");
+
+  const { data, error } = await createPublicClient()
+    .from("products")
+    .select(CARD_SELECT)
+    .eq("category_slug", categorySlug)
+    .neq("id", excludeId)
+    .order("rating_count", { ascending: false })
+    .order("id")
+    .limit(10);
+  if (error) throw new Error(`related products: ${error.message}`);
+  return (data as CardRow[]).map(toCard);
+}
+
 export type SearchResult = { products: ProductCard[]; total: number };
 
 /** Turns free text into a prefix-matching tsquery: "wirel head" -> "wirel:* & head:*". */

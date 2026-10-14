@@ -14,7 +14,8 @@ Goal: one polished, complete shopping loop. Browse → search → PDP → cart �
 - Slice 0 (scaffold, shell): done.
 - Slice 1 (schema, RLS, seed): migration applied to the Supabase project; RLS attack test passes (70/70); seed script written. Seed run and verified idempotent: 81 products, 217 images in Storage, 243 reviews (`npm run seed`; needs `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`).
 - Slices 2 + 3 were built together: home page (hero carousel, deals strip, category rows) and `/s` search with URL-driven filters (category, price, rating), sort and pagination. Category browse is `/s?c=<slug>`; there is no separate `/c/[slug]` route.
-- Next: Slice 4 (product detail page at `/p/[slug]`). Product cards already link there, so it 404s until then.
+- Slice 4 (product detail page, `/p/[slug]`): done. Gallery, price/savings, rating summary + stored reviews, stock status, quantity selector, buy box, related row, JSON-LD. All 81 products are prerendered. **Add to Cart / Buy Now only validate and show a "not connected yet" notice** until Slice 5 wires the cart. Unknown slugs show the not-found page with `noindex` but return HTTP 200 (Cache Components has no `dynamicParams = false`). No rating histogram: only 3 real reviews are stored per product, so a distribution chart would be invented.
+- Next: Slice 5 (guest cart).
 
 ## Decisions still open (resolve before the slice that needs them)
 | # | Question | Needed by | Default if unanswered |

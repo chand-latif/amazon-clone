@@ -67,6 +67,16 @@ export function CheckoutView({ addresses }: { addresses: CheckoutAddress[] }) {
   // order; a different cart/address/total gets a new key (see lib/order-key.ts).
   const [orderKeys] = useState(() => createOrderKeyHolder(randomUuid));
 
+  // The cart store learns who the user is from the header. If that never happens (the header
+  // could not read the session), don't show a skeleton forever.
+  const loadingCart = cart.status === "loading";
+  const [stalled, setStalled] = useState(false);
+  useEffect(() => {
+    if (!loadingCart) return;
+    const t = setTimeout(() => setStalled(true), 6000);
+    return () => clearTimeout(t);
+  }, [loadingCart]);
+
   // A page restored from the back/forward cache must not carry an old key into a new order.
   useEffect(() => {
     const onShow = (e: PageTransitionEvent) => {
@@ -102,7 +112,39 @@ export function CheckoutView({ addresses }: { addresses: CheckoutAddress[] }) {
   const unitCount = rows.reduce((n, r) => (r.problem ? n : n + r.line.quantity), 0);
   const moreForFreeShipping = untilFreeShippingCents(subtotalCents);
 
-  if (cart.status === "loading" || cart.mode !== "user") return <CartSkeleton />;
+  if (loadingCart && !stalled) return <CartSkeleton />;
+
+  // The server let this person in, but the cart store sees a guest (or never heard back): the
+  // session and the page disagree. Say so, instead of spinning or showing someone else's empty cart.
+  if (loadingCart || cart.mode !== "user") {
+    return (
+      <div className="mx-auto max-w-xl rounded bg-surface px-6 py-12 text-center shadow-sm">
+        <h1 className="text-xl font-bold">We couldn&apos;t confirm you&apos;re signed in</h1>
+        <p className="mt-2 text-sm text-zinc-600">Nothing has been charged. Reload the page, or sign in again to continue.</p>
+        <div className="mt-4 flex flex-wrap justify-center gap-3">
+          <button type="button" onClick={() => window.location.reload()} className="rounded-full bg-accent px-5 py-2 text-sm font-medium text-navy hover:bg-accent-hover">
+            Reload
+          </button>
+          <Link href="/signin?next=/checkout" className="rounded-full border border-zinc-400 px-5 py-2 text-sm hover:bg-zinc-100">
+            Sign in
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // The cart couldn't be read, so an empty list here would be a lie ("Your cart is empty").
+  if (cart.loadFailed) {
+    return (
+      <div className="mx-auto max-w-xl rounded bg-surface px-6 py-12 text-center shadow-sm">
+        <h1 className="text-xl font-bold">We couldn&apos;t load your cart</h1>
+        <p className="mt-2 text-sm text-zinc-600">Nothing has been charged. This is just a loading problem.</p>
+        <button type="button" onClick={() => void reloadCart()} className="mt-4 rounded-full bg-accent px-5 py-2 text-sm font-medium text-navy hover:bg-accent-hover">
+          Try again
+        </button>
+      </div>
+    );
+  }
 
   if (cart.lines.length === 0) {
     return (

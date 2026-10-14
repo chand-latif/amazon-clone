@@ -228,6 +228,11 @@ begin
   -------------------------------------------------------------------------
   r := r || public._t_check('place_order: SECURITY DEFINER with a pinned search_path',
     exists (select 1 from pg_proc p where p.proname = 'place_order' and p.prosecdef and p.proconfig @> array['search_path=""']));
+  -- A line added after the cart locks were taken can't be created in one session, so guard the cause: no user-wide cart delete.
+  r := r || public._t_check('place_order deletes only the ordered cart lines, never the whole cart',
+    (select p.prosrc ~* 'delete from public\.cart_items ci\s+where ci\.user_id = uid\s+and ci\.product_id in'
+        and p.prosrc !~* 'delete from public\.cart_items where user_id = uid'
+       from pg_proc p where p.proname = 'place_order'));
   r := r || public._t_check('place_order takes NO prices, quantities or user id (only address, expected total, key)',
     (select p.proargnames[1:3] from pg_proc p where p.proname = 'place_order' and p.pronargs = 3)
       = array['p_address_id', 'p_expected_total_cents', 'p_idempotency_key']);

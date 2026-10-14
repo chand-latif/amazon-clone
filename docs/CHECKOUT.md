@@ -24,7 +24,7 @@ So it is built defensively:
 | search_path hijack | `set search_path = ''`, everything schema-qualified. |
 | Who can call it | `authenticated` only (`anon` and `public` revoked). A token with no subject gets `not_authenticated`. |
 
-Everything is one transaction: any failure rolls back **all** of it (no order, stock untouched, cart intact).
+Everything is one transaction: any failure rolls back **all** of it (no order, stock untouched, cart intact). On success it removes only the cart lines that were ordered (not every row for the user), so a line added in another tab after the locks were taken is never silently deleted.
 
 ### Address limits live in the database, not just the form
 
@@ -79,8 +79,8 @@ Flat shipping $4.99, **free at $35.00 and over**, tax 0 (demo). The rule lives i
 
 | What | Where | Result |
 |---|---|---|
-| place_order correctness and attacks (cross-user address, stale total, stock, inactive, empty, snapshots, idempotency, key isolation, $34.99/$35.00 boundary, anon/no-subject, structure) | `supabase/tests/place_order.test.sql` | 32 checks |
-| RLS isolation across all tables, incl. no client writes to orders/stock and forged idempotency keys | `supabase/tests/rls.test.sql` | 113 checks |
+| place_order correctness and attacks (cross-user address, stale total, stock, inactive, empty, snapshots, idempotency, key isolation, $34.99/$35.00 boundary, anon/no-subject, structure) | `supabase/tests/place_order.test.sql` | 33 checks |
+| RLS isolation across all tables, incl. no client writes to orders/stock and forged idempotency keys | `supabase/tests/rls.test.sql` | 131 checks |
 | **Real concurrency** with signed-in sessions: last unit sold once (8 rounds), opposite-order carts don't deadlock (12 rounds), double submit with the same key = 1 order, with different keys = 1 order | `npm run test:race` | passes |
 
 `npm run test:race` creates two throwaway users and temporary `zz-race-*` products with the service-role key, and

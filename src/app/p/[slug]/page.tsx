@@ -99,13 +99,13 @@ function ProductDetails({ product }: { product: ProductDetail }) {
       <nav aria-label="Breadcrumb" className="text-xs text-zinc-600">
         <ol className="flex flex-wrap items-center gap-1">
           <li>
-            <Link href="/" className="hover:text-price hover:underline">
+            <Link href="/" className="-my-1.5 inline-block py-1.5 hover:text-price hover:underline">
               Home
             </Link>
           </li>
           <li aria-hidden>›</li>
           <li>
-            <Link href={`/s?c=${product.categorySlug}`} className="hover:text-price hover:underline">
+            <Link href={`/s?c=${product.categorySlug}`} className="-my-1.5 inline-block py-1.5 hover:text-price hover:underline">
               {product.categoryName}
             </Link>
           </li>
@@ -129,7 +129,7 @@ function ProductDetails({ product }: { product: ProductDetail }) {
           <h1 className="text-xl font-medium leading-snug sm:text-2xl">{product.title}</h1>
           {product.brand && (
             <p className="mt-1 text-sm">
-              <Link href={`/s?k=${encodeURIComponent(product.brand)}`} className="text-link hover:text-price hover:underline">
+              <Link href={`/s?k=${encodeURIComponent(product.brand)}`} className="-my-1 inline-block py-1 text-link hover:text-price hover:underline">
                 Brand: {product.brand}
               </Link>
             </p>
@@ -138,7 +138,7 @@ function ProductDetails({ product }: { product: ProductDetail }) {
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
             <span className="font-medium">{product.ratingAvg.toFixed(1)}</span>
             <StarRating rating={product.ratingAvg} />
-            <a href="#reviews" className="text-link hover:text-price hover:underline">
+            <a href="#reviews" className="-my-1 inline-block py-1 text-link hover:text-price hover:underline">
               {product.ratingCount.toLocaleString("en-US")} ratings
             </a>
           </div>

@@ -37,10 +37,10 @@ export function Footer() {
           {COLUMNS.map((col) => (
             <div key={col.title}>
               <h2 className="mb-3 text-base font-bold text-white">{col.title}</h2>
-              <ul className="space-y-2 text-sm">
+              <ul className="space-y-1 text-sm">
                 {col.links.map((l) => (
                   <li key={l.label}>
-                    <Link href={l.href} className="hover:underline">
+                    <Link href={l.href} className="inline-block py-1 hover:underline">
                       {l.label}
                     </Link>
                   </li>

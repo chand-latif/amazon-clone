@@ -148,7 +148,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
             </svg>
           </button>
 
-          <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/30 px-3 py-1.5">
+          <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center rounded-full bg-black/30 px-2 py-0.5">
             {slides.map((s, i) => (
               <button
                 key={s.id}
@@ -156,14 +156,19 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
                 onClick={() => go(i)}
                 aria-label={`Go to slide ${i + 1}`}
                 aria-current={i === index}
-                className={`h-2.5 rounded-full transition-all ${i === index ? "w-6 bg-accent" : "w-2.5 bg-white/60 hover:bg-white"}`}
-              />
+                // The button is the 24px+ touch target; the dot inside is what you see.
+                className="group flex h-6 min-w-6 items-center justify-center"
+              >
+                <span
+                  className={`h-2.5 rounded-full transition-all ${i === index ? "w-6 bg-accent" : "w-2.5 bg-white/60 group-hover:bg-white"}`}
+                />
+              </button>
             ))}
             <button
               type="button"
               onClick={() => setUserPaused((p) => !p)}
               aria-label={userPaused ? "Resume automatic slide rotation" : "Pause automatic slide rotation"}
-              className="ml-1 flex h-5 w-5 items-center justify-center text-white"
+              className="ml-1 flex h-6 w-6 items-center justify-center text-white"
             >
               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden>
                 {userPaused ? <path d="M7 4.5v15l12-7.5-12-7.5z" /> : <path d="M6 4h4v16H6zM14 4h4v16h-4z" />}

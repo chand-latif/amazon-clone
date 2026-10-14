@@ -24,7 +24,7 @@ export function ProductRow({
           {title}
         </h2>
         {href && (
-          <Link href={href} className="text-sm text-link hover:text-price hover:underline">
+          <Link href={href} className="-my-1.5 inline-block py-1.5 text-sm text-link hover:text-price hover:underline">
             See all
           </Link>
         )}

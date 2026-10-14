@@ -41,7 +41,7 @@ export function ActiveFilters({ filters, categoryName }: { filters: SearchFilter
       <li>
         <Link
           href={buildSearchHref({ ...DEFAULT_FILTERS, sort: filters.sort })}
-          className="text-xs text-link hover:underline"
+          className="-my-1.5 inline-block py-1.5 text-xs text-link hover:underline"
         >
           Clear all
         </Link>

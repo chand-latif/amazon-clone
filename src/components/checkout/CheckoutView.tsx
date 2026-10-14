@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { deleteAddress, placeOrder, type PlaceOrderResult } from "@/app/checkout/actions";
 import { Price } from "@/components/Price";
 import { CartSkeleton } from "@/components/Skeletons";
@@ -14,6 +14,7 @@ import { countryName } from "@/lib/countries";
 import { formatPrice } from "@/lib/format";
 import { productImageUrl } from "@/lib/images";
 import { computeTotals, untilFreeShippingCents } from "@/lib/pricing";
+import { createOrderKeyHolder } from "@/lib/order-key";
 import { randomUuid } from "@/lib/uuid";
 import { AddressForm } from "./AddressForm";
 
@@ -62,8 +63,18 @@ export function CheckoutView({ addresses }: { addresses: CheckoutAddress[] }) {
   const [payment, setPayment] = useState<PaymentChoice>("approve");
   const [submitting, setSubmitting] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
-  // One key per checkout visit: a retry or double-click can never create a second order.
-  const [idempotencyKey] = useState(() => randomUuid());
+  // A retry or double-click of the SAME order reuses one key, so it can never create a second
+  // order; a different cart/address/total gets a new key (see lib/order-key.ts).
+  const [orderKeys] = useState(() => createOrderKeyHolder(randomUuid));
+
+  // A page restored from the back/forward cache must not carry an old key into a new order.
+  useEffect(() => {
+    const onShow = (e: PageTransitionEvent) => {
+      if (e.persisted) orderKeys.reset();
+    };
+    window.addEventListener("pageshow", onShow);
+    return () => window.removeEventListener("pageshow", onShow);
+  }, [orderKeys]);
 
   // Derived, not synced: the chosen address wins, then one just added, then the default.
   const selected =
@@ -136,9 +147,11 @@ export function CheckoutView({ addresses }: { addresses: CheckoutAddress[] }) {
     }
 
     setSubmitting(true);
+    const idempotencyKey = orderKeys.keyFor({ addressId: selected.id, totalCents: totals.totalCents, lines: cart.lines });
     const result = await placeOrder({ addressId: selected.id, expectedTotalCents: totals.totalCents, idempotencyKey });
 
     if (result.ok) {
+      orderKeys.reset(); // this order is done; the next one needs its own key
       // The server emptied the cart; bring the badge and cart page in line before we leave.
       await reloadCart();
       router.push(`/orders/${result.orderId}/confirmation`);

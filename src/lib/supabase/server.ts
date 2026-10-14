@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { Database } from "@/lib/database.types";
 import { getSupabaseEnv } from "@/lib/env";
+import { SESSION_COOKIE_OPTIONS, withSessionLifetime } from "./cookie-options";
 
 /**
  * Server Supabase client (anon key; acts as the signed-in user via cookies).
@@ -14,6 +15,7 @@ export async function createClient() {
   const cookieStore = await cookies();
 
   return createServerClient<Database>(url, anonKey, {
+    cookieOptions: SESSION_COOKIE_OPTIONS,
     cookies: {
       getAll() {
         return cookieStore.getAll();
@@ -21,7 +23,7 @@ export async function createClient() {
       setAll(cookiesToSet) {
         try {
           cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options),
+            cookieStore.set(name, value, withSessionLifetime(options)),
           );
         } catch {
           // Called from a Server Component, which can't set cookies.

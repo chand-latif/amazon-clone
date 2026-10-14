@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseEnv } from "@/lib/env";
 import { safeNextPath } from "@/lib/redirect";
+import { SESSION_COOKIE_OPTIONS, withSessionLifetime } from "./cookie-options";
 
 // Pages that need a signed-in user. The proxy only redirects optimistically
 // (fast, no page render); every one of these pages ALSO verifies the user on the
@@ -28,6 +29,7 @@ export async function updateSession(request: NextRequest) {
   const { url, anonKey } = getSupabaseEnv();
 
   const supabase = createServerClient(url, anonKey, {
+    cookieOptions: SESSION_COOKIE_OPTIONS,
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -36,7 +38,7 @@ export async function updateSession(request: NextRequest) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
         response = NextResponse.next({ request });
         cookiesToSet.forEach(({ name, value, options }) =>
-          response.cookies.set(name, value, options),
+          response.cookies.set(name, value, withSessionLifetime(options)),
         );
       },
     },

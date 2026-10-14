@@ -30,12 +30,11 @@ export function ProductRow({
         )}
       </div>
       <ul className="-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-2">
-        {products.map((p, i) => (
+        {products.map((p) => (
           <li key={p.id} className="w-44 shrink-0 snap-start sm:w-52">
             <ProductCard
               product={p}
               discountPct={discounts?.[p.id]}
-              priority={i < 2}
               sizes="208px"
             />
           </li>

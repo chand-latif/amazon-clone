@@ -110,7 +110,7 @@ function ProductDetails({ product }: { product: ProductDetail }) {
             </Link>
           </li>
           <li aria-hidden>›</li>
-          <li aria-current="page" className="line-clamp-1 max-w-xs text-zinc-500">
+          <li aria-current="page" className="line-clamp-1 max-w-xs text-zinc-600">
             {product.title}
           </li>
         </ol>

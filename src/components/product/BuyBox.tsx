@@ -102,7 +102,7 @@ export function BuyBox({
           type="button"
           onClick={() => act("buy")}
           disabled={!available || atLimit || pending !== null}
-          className="w-full rounded-full bg-orange-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-500"
+          className="w-full rounded-full bg-orange-500 px-4 py-2.5 text-sm font-medium text-navy hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-500"
         >
           {pending === "buy" ? "One moment…" : "Buy Now"}
         </button>

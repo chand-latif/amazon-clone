@@ -59,18 +59,21 @@ export type Database = {
       }
       cart_items: {
         Row: {
+          created_at: string
           product_id: string
           quantity: number
           updated_at: string
           user_id: string
         }
         Insert: {
+          created_at?: string
           product_id: string
           quantity: number
           updated_at?: string
           user_id: string
         }
         Update: {
+          created_at?: string
           product_id?: string
           quantity?: number
           updated_at?: string
@@ -349,7 +352,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      merge_cart: {
+        Args: { items: Json }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

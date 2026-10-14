@@ -1,48 +1,62 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { MAX_QTY } from "@/lib/cart/storage";
+import { addToCart, type AddResult } from "@/lib/cart/store";
+import { useCart } from "@/lib/cart/useCart";
 import { formatPrice } from "@/lib/format";
 import { SITE_NAME } from "@/lib/site";
 
-const MAX_PER_ORDER = 10; // matches cart_items.quantity check (1..10)
-
-/**
- * Purchase panel: stock status, quantity, Add to Cart / Buy Now.
- * The buttons validate and announce, but the cart arrives in a later slice,
- * so they say so instead of pretending to work.
- */
+/** Purchase panel: stock status, quantity, Add to Cart / Buy Now, wired to the real cart. */
 export function BuyBox({
-  title,
+  productId,
   priceCents,
   stock,
   delivery,
 }: {
-  title: string;
+  productId: string;
   priceCents: number;
   stock: number;
   /** e.g. "Ships in 3-5 business days", if the product has shipping info. */
   delivery: string | null;
 }) {
-  const maxQty = Math.min(MAX_PER_ORDER, stock);
+  const router = useRouter();
+  const cart = useCart();
+  const limit = Math.min(MAX_QTY, stock); // most of this product one cart can hold
   const [qty, setQty] = useState(1);
-  const [notice, setNotice] = useState<string | null>(null);
-  const available = stock > 0;
-  const safeQty = Math.min(Math.max(qty, 1), Math.max(maxQty, 1));
+  const [pending, setPending] = useState<"add" | "buy" | null>(null);
+  const [result, setResult] = useState<AddResult | null>(null);
+  const [failed, setFailed] = useState(false);
 
-  const act = (kind: "add" | "buy") => {
-    if (!available) return;
-    setNotice(
-      kind === "add"
-        ? `Cart isn't connected yet, so ${safeQty} × “${title}” wasn't added. It arrives in the next update.`
-        : "Checkout isn't connected yet. It arrives in a later update.",
-    );
+  const available = stock > 0;
+  const safeQty = Math.min(Math.max(qty, 1), Math.max(limit, 1));
+  const inCart = cart.lines.find((l) => l.productId === productId)?.quantity ?? 0;
+  const atLimit = available && inCart >= limit;
+
+  const act = async (kind: "add" | "buy") => {
+    if (!available || pending) return;
+    setPending(kind);
+    setFailed(false);
+    try {
+      const outcome = await addToCart(productId, safeQty, limit);
+      if (kind === "buy") {
+        router.push("/checkout");
+        return;
+      }
+      setResult(outcome);
+    } catch (error) {
+      console.error("Add to cart failed:", error);
+      setFailed(true);
+    } finally {
+      setPending(null);
+    }
   };
 
   return (
     <section aria-label="Purchase options" className="rounded border border-zinc-300 p-4">
-      <p className="text-sm text-zinc-600">
-        {safeQty > 1 ? `Total for ${safeQty} items` : "Total"}
-      </p>
+      <p className="text-sm text-zinc-600">{safeQty > 1 ? `Total for ${safeQty} items` : "Total"}</p>
       <p className="text-2xl font-medium text-price">{formatPrice(priceCents * safeQty)}</p>
 
       {delivery && <p className="mt-2 text-sm text-zinc-700">{delivery}</p>}
@@ -61,16 +75,17 @@ export function BuyBox({
             value={safeQty}
             onChange={(e) => {
               setQty(Number(e.target.value));
-              setNotice(null);
+              setResult(null);
             }}
             className="rounded-md border border-zinc-300 bg-zinc-100 px-2 py-1.5 hover:bg-zinc-200"
           >
-            {Array.from({ length: maxQty }, (_, i) => i + 1).map((n) => (
+            {Array.from({ length: limit }, (_, i) => i + 1).map((n) => (
               <option key={n} value={n}>
                 {n}
               </option>
             ))}
           </select>
+          {inCart > 0 && <span className="text-xs text-zinc-600">({inCart} in your cart)</span>}
         </div>
       )}
 
@@ -78,24 +93,47 @@ export function BuyBox({
         <button
           type="button"
           onClick={() => act("add")}
-          disabled={!available}
+          disabled={!available || atLimit || pending !== null}
           className="w-full rounded-full bg-accent px-4 py-2.5 text-sm font-medium text-navy hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-500"
         >
-          Add to Cart
+          {pending === "add" ? "Adding…" : "Add to Cart"}
         </button>
         <button
           type="button"
           onClick={() => act("buy")}
-          disabled={!available}
+          disabled={!available || atLimit || pending !== null}
           className="w-full rounded-full bg-orange-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-500"
         >
-          Buy Now
+          {pending === "buy" ? "One moment…" : "Buy Now"}
         </button>
       </div>
+      {atLimit && (
+        <p className="mt-2 text-xs text-zinc-600">
+          You have the maximum available ({limit}) of this item in your cart.
+        </p>
+      )}
 
-      <p role="status" aria-live="polite" className={notice ? "mt-3 rounded bg-amber-50 p-2 text-xs text-amber-900" : "sr-only"}>
-        {notice ?? ""}
-      </p>
+      {/* Announced to screen readers when it changes. */}
+      <div role="status" aria-live="polite">
+        {result && (
+          <div className="mt-3 rounded border border-emerald-600 bg-emerald-50 p-3 text-sm text-emerald-900">
+            <p className="font-bold">
+              {result.clamped ? `Cart updated: ${result.quantity} in your cart` : "Added to Cart"}
+            </p>
+            {result.clamped && (
+              <p className="mt-1 text-xs">That&apos;s the most you can have of this item ({limit}), so we stopped there.</p>
+            )}
+            <Link href="/cart" className="mt-2 inline-block text-link underline">
+              Go to Cart ({cart.count} {cart.count === 1 ? "item" : "items"})
+            </Link>
+          </div>
+        )}
+        {failed && (
+          <p className="mt-3 rounded border border-price bg-red-50 p-2 text-xs text-price">
+            We couldn&apos;t add that to your cart. Please try again.
+          </p>
+        )}
+      </div>
 
       <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 border-t border-zinc-200 pt-3 text-xs text-zinc-600">
         <dt>Ships from</dt>

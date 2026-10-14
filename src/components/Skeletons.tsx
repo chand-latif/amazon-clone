@@ -42,6 +42,28 @@ export function HomeSkeleton() {
   );
 }
 
+export function CartSkeleton({ rows = 2 }: { rows?: number }) {
+  return (
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]" role="status" aria-label="Loading your cart">
+      <div className="space-y-3 rounded bg-surface p-4 shadow-sm" aria-hidden>
+        <Bar className="h-7 w-48" />
+        {Array.from({ length: rows }, (_, i) => (
+          <div key={i} className="flex gap-4 border-t border-zinc-200 pt-4">
+            <Bar className="h-28 w-28 shrink-0" />
+            <div className="flex-1 space-y-2">
+              <Bar className="h-4 w-3/4" />
+              <Bar className="h-4 w-1/3" />
+              <Bar className="h-8 w-24" />
+            </div>
+          </div>
+        ))}
+      </div>
+      <Bar className="h-40 w-full" />
+      <span className="sr-only">Loading your cart…</span>
+    </div>
+  );
+}
+
 export function AuthSkeleton() {
   return (
     <div className="mx-auto w-full max-w-sm py-6" role="status" aria-label="Loading">

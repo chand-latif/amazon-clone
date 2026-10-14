@@ -160,7 +160,7 @@ function ProductDetails({ product }: { product: ProductDetail }) {
         </div>
 
         <div className="lg:sticky lg:top-28 lg:col-start-3 lg:row-span-2 lg:row-start-1 lg:self-start">
-          <BuyBox title={product.title} priceCents={product.priceCents} stock={product.stock} delivery={delivery} />
+          <BuyBox productId={product.id} priceCents={product.priceCents} stock={product.stock} delivery={delivery} />
         </div>
 
         <div className="min-w-0 lg:col-start-2 lg:row-start-2">

@@ -2,12 +2,10 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { CATEGORIES } from "@/lib/site";
 import { AccountLink, AccountMenu } from "./AccountMenu";
+import { CartLink } from "./cart/CartLink";
 import { Logo } from "./Logo";
 import { SearchBar } from "./SearchBar";
 import { SearchForm } from "./SearchForm";
-
-// Placeholder until the cart exists; the account state arrives with auth.
-const CART_COUNT = 0;
 
 export function Header() {
   return (
@@ -30,23 +28,7 @@ export function Header() {
             <AccountMenu />
           </Suspense>
 
-          <Link
-            href="/cart"
-            aria-label={`Cart, ${CART_COUNT} items`}
-            className="flex items-end gap-1 rounded px-2 py-1 hover:outline hover:outline-1 hover:outline-white/60"
-          >
-            <span className="relative">
-              <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-                <path d="M3 4h2.2l2.1 10.2a1.5 1.5 0 0 0 1.5 1.2h8.4a1.5 1.5 0 0 0 1.5-1.1L20.5 8H6.2" strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx="9.5" cy="19.2" r="1.3" />
-                <circle cx="17" cy="19.2" r="1.3" />
-              </svg>
-              <span className="absolute -top-1 left-3 min-w-5 rounded-full bg-accent px-1 text-center text-sm font-bold leading-5 text-navy">
-                {CART_COUNT}
-              </span>
-            </span>
-            <span className="text-sm font-bold">Cart</span>
-          </Link>
+          <CartLink />
           </div>
         </div>
       </div>

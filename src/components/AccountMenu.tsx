@@ -2,6 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { getHeaderUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { CartSync } from "./cart/CartSync";
 
 const linkClass =
   "rounded px-2 py-1 text-xs leading-tight hover:outline hover:outline-1 hover:outline-white/60";
@@ -29,12 +30,23 @@ export async function AccountMenu() {
   // would bake the signed-out header into the static page.
   const supabase = await createClient();
 
-  let user = null;
+  // undefined = "couldn't tell" (as opposed to null = "definitely signed out"), so a
+  // failed lookup never makes the cart think a signed-in user is a guest.
+  let userId: string | null | undefined;
+  let name: string | null = null;
   try {
-    user = await getHeaderUser(supabase);
+    const user = await getHeaderUser(supabase);
+    userId = user?.id ?? null;
+    name = user?.name ?? null;
   } catch (error) {
     // A header hiccup must never take the page down; show the signed-out state.
     console.error("Header user lookup failed:", error);
   }
-  return <AccountLink name={user?.name ?? null} />;
+  return (
+    <>
+      <AccountLink name={name} />
+      {/* Tells the cart whether to use the local (guest) or database cart. Renders nothing. */}
+      <CartSync userId={userId} />
+    </>
+  );
 }

@@ -112,6 +112,27 @@ begin
   r := r || public._t_check('A can update own cart row',                  public._t_rows(format('update public.cart_items set quantity = 4 where user_id = %L and product_id = %L', ua, p3)) = 1);
   r := r || public._t_check('A can delete own cart row',                  public._t_rows(format('delete from public.cart_items where user_id = %L and product_id = %L', ua, p3)) = 1);
 
+  -- CART: merge_cart (guest cart -> account cart). A starts with p1 x1.
+  perform public.merge_cart(json_build_array(json_build_object('product_id', p1, 'qty', 3), json_build_object('product_id', p3, 'qty', 2))::jsonb);
+  r := r || public._t_check('merge sums with existing (p1: 1+3=4)',        public._t_count(format('select 1 from public.cart_items where user_id = %L and product_id = %L and quantity = 4', ua, p1)) = 1);
+  r := r || public._t_check('merge inserts new lines (p3 = 2)',            public._t_count(format('select 1 from public.cart_items where user_id = %L and product_id = %L and quantity = 2', ua, p3)) = 1);
+  perform public.merge_cart(json_build_array(json_build_object('product_id', p1, 'qty', 2), json_build_object('product_id', p1, 'qty', 9))::jsonb);
+  r := r || public._t_check('duplicate ids in one payload combine, then clamp to 10', public._t_count(format('select 1 from public.cart_items where user_id = %L and product_id = %L and quantity = 10', ua, p1)) = 1);
+  perform public.merge_cart(json_build_array(json_build_object('product_id', p2, 'qty', 1), json_build_object('product_id', gen_random_uuid(), 'qty', 1))::jsonb);
+  r := r || public._t_check('inactive and unknown products are skipped',   public._t_count(format('select 1 from public.cart_items where user_id = %L and product_id not in (%L, %L)', ua, p1, p3)) = 0);
+  perform public.merge_cart(json_build_array(json_build_object('product_id', p3, 'qty', 0), json_build_object('product_id', p3, 'qty', -5))::jsonb);
+  r := r || public._t_check('zero and negative quantities are ignored',    public._t_count(format('select 1 from public.cart_items where user_id = %L and product_id = %L and quantity = 2', ua, p3)) = 1);
+  perform public.merge_cart(json_build_array(json_build_object('product_id', p3, 'qty', 999999))::jsonb);
+  r := r || public._t_check('a huge quantity clamps to 10',                public._t_count(format('select 1 from public.cart_items where user_id = %L and product_id = %L and quantity = 10', ua, p3)) = 1);
+  r := r || public._t_check('merging an empty array is a no-op',           public._t_rows('select public.merge_cart(''[]''::jsonb)') = 1);
+  r := r || public._t_raises('non-array payload is rejected',              'select public.merge_cart(''{"a":1}''::jsonb)', '22023');
+  r := r || public._t_raises('payload over 100 items is rejected',         'select public.merge_cart((select jsonb_agg(jsonb_build_object(''product_id'', gen_random_uuid(), ''qty'', 1)) from generate_series(1, 101)))', '22023');
+  r := r || public._t_raises('malformed uuid is rejected',                 'select public.merge_cart(''[{"product_id":"not-a-uuid","qty":1}]''::jsonb)', '22P02');
+  r := r || public._t_check('merge never touched B''s cart',               public._t_count(format('select 1 from public.cart_items where user_id = %L', ub)) = 0);
+  -- put A's cart back how the later checks expect it
+  perform public._t_rows(format('delete from public.cart_items where user_id = %L and product_id = %L', ua, p3));
+  perform public._t_rows(format('update public.cart_items set quantity = 1 where user_id = %L and product_id = %L', ua, p1));
+
   -- ORDERS: reads
   r := r || public._t_check('A sees exactly 1 order (own)',               public._t_count('select 1 from public.orders') = 1);
   r := r || public._t_check('A sees 0 of B''s orders',                    public._t_count(format('select 1 from public.orders where user_id = %L', ub)) = 0);
@@ -190,6 +211,7 @@ begin
   r := r || public._t_check('no-sub token sees 0 addresses',              public._t_count('select 1 from public.addresses') = 0);
   r := r || public._t_check('no-sub token sees 0 profiles',               public._t_count('select 1 from public.profiles') = 0);
   r := r || public._t_raises('no-sub token cannot insert a cart row',    format('insert into public.cart_items (user_id, product_id, quantity) values (%L, %L, 1)', ua, p3), '42501');
+  r := r || public._t_raises('no-sub token cannot merge_cart',            'select public.merge_cart(''[]''::jsonb)', '28000');
   reset role;
 
   ---------------------------------------------------------------------------
@@ -203,6 +225,7 @@ begin
   r := r || public._t_raises('anon cannot read addresses',                'select 1 from public.addresses', '42501');
   r := r || public._t_raises('anon cannot read profiles',                 'select 1 from public.profiles', '42501');
   r := r || public._t_raises('anon cannot update profiles',               'update public.profiles set full_name = ''x''', '42501');
+  r := r || public._t_raises('anon cannot call merge_cart',               'select public.merge_cart(''[]''::jsonb)', '42501');
   r := r || public._t_check('anon reads active products (2)',             public._t_count('select 1 from public.products where category_slug = ''rls-test''') = 2);
   r := r || public._t_check('anon cannot see inactive product',           public._t_count(format('select 1 from public.products where id = %L', p2)) = 0);
   r := r || public._t_raises('anon cannot INSERT a product',              'insert into public.products (slug, title, category_slug, price_cents) values (''evil'', ''evil'', ''rls-test'', 1)', '42501');
@@ -267,6 +290,12 @@ begin
   r := r || public._t_check('handle_new_user is not executable by anon or authenticated',
     not has_function_privilege('anon', 'public.handle_new_user()', 'execute')
     and not has_function_privilege('authenticated', 'public.handle_new_user()', 'execute'));
+  r := r || public._t_check('merge_cart is SECURITY INVOKER, pins search_path, takes only the items (no user id param)',
+    exists (select 1 from pg_proc p where p.proname = 'merge_cart' and not p.prosecdef and p.pronargs = 1
+              and p.proconfig @> array['search_path=""']));
+  r := r || public._t_check('merge_cart: authenticated may execute, anon may not',
+    has_function_privilege('authenticated', 'public.merge_cart(jsonb)', 'execute')
+    and not has_function_privilege('anon', 'public.merge_cart(jsonb)', 'execute'));
   r := r || public._t_check('no views in public (views can bypass RLS)',
     (select count(*) from pg_views where schemaname = 'public') = 0);
 

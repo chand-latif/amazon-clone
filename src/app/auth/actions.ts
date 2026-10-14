@@ -60,8 +60,16 @@ function describe(error: AuthError): string {
   }
 }
 
-async function callbackUrl(next: string) {
-  return `${await getSiteUrl()}/auth/callback?next=${encodeURIComponent(next)}`;
+const EMAIL_UNAVAILABLE = "Email sign-in is temporarily unavailable. Please try again later.";
+
+/** The link Supabase emails to the user, or null when no trusted site URL is configured (production fails closed). */
+async function callbackUrl(next: string): Promise<string | null> {
+  try {
+    return `${await getSiteUrl()}/auth/callback?next=${encodeURIComponent(next)}`;
+  } catch (e) {
+    console.error("Cannot build auth callback URL:", e instanceof Error ? e.message : e);
+    return null;
+  }
 }
 
 export async function signInWithPassword(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -94,6 +102,9 @@ export async function signUpWithPassword(_prev: FormState, formData: FormData): 
   else if (password.length > MAX_PASSWORD) fieldErrors.password = `Use at most ${MAX_PASSWORD} characters.`;
   if (fieldErrors.email || fieldErrors.password) return { fieldErrors, values: { email, fullName } };
 
+  const redirectTo = await callbackUrl(next);
+  if (!redirectTo) return { error: EMAIL_UNAVAILABLE, values: { email, fullName } };
+
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -101,7 +112,7 @@ export async function signUpWithPassword(_prev: FormState, formData: FormData): 
     options: {
       // Becomes profiles.full_name via the signup trigger (trimmed/limited there too).
       data: fullName ? { full_name: fullName } : undefined,
-      emailRedirectTo: await callbackUrl(next),
+      emailRedirectTo: redirectTo,
     },
   });
   if (error) return { error: describe(error), values: { email, fullName } };
@@ -123,10 +134,13 @@ export async function sendMagicLink(_prev: FormState, formData: FormData): Promi
 
   if (!validEmail(email)) return { fieldErrors: { email: "Enter a valid email address." }, values: { email } };
 
+  const redirectTo = await callbackUrl(next);
+  if (!redirectTo) return { error: EMAIL_UNAVAILABLE, values: { email } };
+
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: await callbackUrl(next), shouldCreateUser: true },
+    options: { emailRedirectTo: redirectTo, shouldCreateUser: true },
   });
   if (error) return { error: describe(error), values: { email } };
 

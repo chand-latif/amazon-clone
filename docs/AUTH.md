@@ -16,8 +16,12 @@ The app can't change these (no API access), and auth emails fail or misroute wit
 
    If the link's redirect target isn't on this list, Supabase **silently falls back to the Site URL**,
    which drops the `next` redirect-back and lands users on the wrong page.
-2. **Production env var**: set `NEXT_PUBLIC_SITE_URL` on Vercel to the production URL. Local dev
-   derives it from the request host; Vercel previews use `VERCEL_URL`.
+2. **Production env var**: set `NEXT_PUBLIC_SITE_URL` on Vercel to the production URL (https). In production the
+   app **fails closed**: with no trusted URL it refuses to send auth emails instead of trusting the request
+   `Host` header (which an attacker can forge to make Supabase email a victim a link to another domain).
+   Resolution order (`src/lib/site-url-resolve.ts`, tested by `npm test`): `NEXT_PUBLIC_SITE_URL` →
+   Vercel production host (`VERCEL_PROJECT_PRODUCTION_URL`) → Vercel preview host (`VERCEL_URL`) → request
+   host in **development only**.
 3. **Email delivery** (Authentication → Emails → SMTP Settings)
    - Supabase's built-in SMTP is for testing only: it **only delivers to your organisation's members**
      and has a very low hourly limit (the app shows "Too many attempts" when it is hit).

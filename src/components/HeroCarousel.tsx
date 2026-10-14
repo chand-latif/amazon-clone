@@ -45,10 +45,18 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
   const [userPaused, setUserPaused] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
+  // Only the first slide is on screen at load, so only it competes for bandwidth. The rest are
+  // fetched shortly after, so they are ready (not blank) when the carousel moves to them.
+  const [warm, setWarm] = useState(false);
   const reducedMotion = usePrefersReducedMotion();
 
   const count = slides.length;
   const autoplaying = count > 1 && !userPaused && !hovered && !focused && !reducedMotion;
+
+  useEffect(() => {
+    const t = setTimeout(() => setWarm(true), 1500);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     if (!autoplaying) return;
@@ -108,7 +116,7 @@ export function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
                   alt={s.imageAlt}
                   fill
                   sizes="(min-width: 640px) 33vw, 40vw"
-                  priority={i === 0}
+                  {...(i === 0 ? { priority: true } : { loading: warm ? "eager" : "lazy" })}
                   className="object-contain drop-shadow-2xl"
                 />
               </div>

@@ -14,6 +14,7 @@ import { countryName } from "@/lib/countries";
 import { formatPrice } from "@/lib/format";
 import { productImageUrl } from "@/lib/images";
 import { computeTotals, untilFreeShippingCents } from "@/lib/pricing";
+import { randomUuid } from "@/lib/uuid";
 import { AddressForm } from "./AddressForm";
 
 export type CheckoutAddress = {
@@ -62,7 +63,7 @@ export function CheckoutView({ addresses }: { addresses: CheckoutAddress[] }) {
   const [submitting, setSubmitting] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
   // One key per checkout visit: a retry or double-click can never create a second order.
-  const [idempotencyKey] = useState(() => crypto.randomUUID());
+  const [idempotencyKey] = useState(() => randomUuid());
 
   // Derived, not synced: the chosen address wins, then one just added, then the default.
   const selected =
